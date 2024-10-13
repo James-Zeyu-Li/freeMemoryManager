@@ -1,13 +1,10 @@
 #include <iostream>
 #include <vector>
-#include <queue>
 #include <map>
 #include <cstdlib>
 #include <string>
 #include <sstream>
-#include <cassert>
 #include <algorithm>
-#include <iomanip>
 #include <getopt.h>
 
 using namespace std;
@@ -37,12 +34,6 @@ struct Malloc {
     }
 };
 
-void addToMap(Malloc &m, int address, int sizeWithHead) {
-    if (m.sizeMap.find(address) == m.sizeMap.end()) {
-        m.sizeMap[address] = sizeWithHead;
-    }
-}
-
 // The function to dump the free list
 void dumpFreeList(const Malloc &m) {
     cout << "Free List [Size: " << m.freelist.size() << "]: ";
@@ -53,9 +44,9 @@ void dumpFreeList(const Malloc &m) {
 }
 
 void displayAllocatedBlocks(const Malloc &m) {
-    cout << "Allocated Blocks: [";
+    cout << "Allocated Blocks [Size: " << m.sizeMap.size() << "]: ";
     for (const auto &entry : m.sizeMap) {
-        cout << "[Address: " << entry.first << ", Size: " << entry.second << "] ";
+        cout << "[ID: " << entry.first << ", Address: " << entry.second.first << ", Size: " << entry.second.second << "] ";
     }
     cout << "]" << endl;
 }
@@ -68,9 +59,6 @@ std::pair<int, int> allocate(Malloc &m, int request) {
     int count = 0;
 
     int sizeWithHead = request + m.headerSize;
-
-    cout << "Attempting to allocate " << request << " (including header: " << sizeWithHead << ")" << endl;
-    dumpFreeList(m);
 
     // set best address if the policy selection is BEST
     if (m.policy == Policy::BEST)     {
@@ -119,8 +107,6 @@ std::pair<int, int> allocate(Malloc &m, int request) {
         cout << "Allocated at address " << bestAddress << " with ID " << m.counter << endl;
         m.counter++;
 
-        addToMap(m, bestAddress, sizeWithHead);
-        cout << "Allocated at address " << bestAddress << endl;
         dumpFreeList(m);
         displayAllocatedBlocks(m);
 
@@ -173,7 +159,8 @@ int free(Malloc &m, int blockID) {
         m.freelist = newFreelist;
     }
 
-    cout << "Freed block with ID " << blockID << endl;
+    dumpFreeList(m);
+    displayAllocatedBlocks(m);
     return 0;
 }
 
@@ -187,7 +174,7 @@ struct Options
     Order order = Order::ADDRSORT;
     bool coalesce = false;
     vector<Job> jobList = {
-        Job{vector<int>{+7, -0}}}; //, +5, +4, +9, -2, -1, -3, +80
+        Job{vector<int>{+7, -0, +5, +4, +9, -2, -1, -3, +80}}}; 
 };
 
 
@@ -202,8 +189,6 @@ void showHelp() {
               << "-A,         list of operations (+10,-0,etc)\n"
               << "-h,         show this help message and exit\n";
 }
-
-
 
 void Abort(const string &str)
 {
@@ -373,11 +358,12 @@ int main(int argc, char const *argv[]) {
                 if (address == -1) {
                     cout << "Failed to allocate " << operation << " in " << count << " searches \n" << endl;
                 } else {
-                    cout << "Allocated " << operation << " at " << address << " in " << count << " searches \n" << endl;
+                    cout << "Allocated block of size" << operation << " at " << address << " in " << count << " searches \n" << endl;
                 }
             } else {
-                free(m, -operation);
-                cout << "Freed " << -operation << endl;
+                int blockID = -operation; // Convert negative operation to block ID
+                free(m, blockID);
+                cout << "Freed block with ID " << blockID << "\n" << endl;
             }
         }
     }
