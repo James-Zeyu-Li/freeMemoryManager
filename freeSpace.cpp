@@ -51,6 +51,19 @@ void displayAllocatedBlocks(const Malloc &m) {
     cout << "]" << endl;
 }
 
+void printInitialSetup(const Malloc &m) {
+    cout << "Initial Setup: " << endl;
+    cout << "Heap Size: " << m.size << endl;
+    cout << "Base Address: " << m.start << endl;
+    cout << "Header Size: " << m.headerSize << endl;
+    cout << "Allocation Policy: " << (m.policy == Policy::BEST ? "BEST" :
+                                     m.policy == Policy::WORST ? "WORST" : "FIRST") << endl;
+    cout << "Free List Order: " << (m.order == Order::ADDRSORT ? "ADDRSORT" :
+                                     m.order == Order::SIZESORT_ASC ? "SIZESORT+" : "SIZESORT-") << endl;
+    cout << "Coalescing: " << (m.coalesce ? "Enabled" : "Disabled") << endl;
+    cout << endl;
+}
+
 
 // Find the address and size to be allocated according to the policy
 std::pair<int, int> allocate(Malloc &m, int request) {
@@ -103,8 +116,7 @@ std::pair<int, int> allocate(Malloc &m, int request) {
             abort();
         }
 
-        m.sizeMap[m.counter] = {bestAddress, sizeWithHead};
-        cout << "Allocated at address " << bestAddress << " with ID " << m.counter << endl;
+        m.sizeMap[m.counter] = {bestAddress, sizeWithHead};        
         m.counter++;
 
         dumpFreeList(m);
@@ -351,14 +363,17 @@ int main(int argc, char const *argv[]) {
 
     Malloc m(opts.size, opts.start, opts.headerSize, opts.policy, opts.order, opts.coalesce);
 
+    printInitialSetup(m);
+
     for (auto &job : opts.jobList) {
         for (auto &operation : job.operation) {
             if (operation > 0) {
+                cout << "Allocating size " << operation << endl;
                 auto [address, count] = allocate(m, operation);
                 if (address == -1) {
                     cout << "Failed to allocate " << operation << " in " << count << " searches \n" << endl;
                 } else {
-                    cout << "Allocated block of size" << operation << " at " << address << " in " << count << " searches \n" << endl;
+                    cout << "Allocated block of size " << operation << " at " << address << " in " << count << " searches \n" << endl;
                 }
             } else {
                 int blockID = -operation; // Convert negative operation to block ID
