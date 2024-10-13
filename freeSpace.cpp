@@ -336,6 +336,7 @@ Options parseOptions(int argc, char *argv[])
         case 'A':
             if (optarg != nullptr)
             {
+                opts.jobList.clear(); 
                 Job job;
                 splitStringToInt(optarg, ',', job.operation);
                 opts.jobList.push_back(job);
@@ -377,11 +378,14 @@ int main(int argc, char const *argv[]) {
                 }
             } else {
                 int blockID = -operation; // Convert negative operation to block ID
-                free(m, blockID);
-                cout << "Freed block with ID " << blockID << "\n" << endl;
+                int freeResult = free(m, blockID);
+                if (freeResult == 0) {
+                    cout << "Freed block with ID " << blockID << "\n" << endl;
+                } else {
+                    cout << "Failed to free block with ID " << blockID << "\n" << endl;
+                }
             }
         }
     }
-
     return 0;
 }
