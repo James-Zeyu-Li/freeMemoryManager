@@ -9,7 +9,7 @@
 
 using namespace std;
 
-enum class Policy { BEST, WORST, FIRST};
+enum class Policy { BEST, WORST, FIRST, NEXTFIT};
 enum class Order {ADDRSORT, SIZESORT_ASC, SIZESORT_DES};
 
 struct Job{
@@ -26,6 +26,7 @@ struct Malloc {
     vector<pair<int, int>> freelist;
     map<int, pair<int, int>> sizeMap;
     int counter = 0;
+    int lastAllocatedIdx = 0;
 
     Malloc(int size, int start, int headerSize, Policy policy, Order order, bool coalesce)
         : size(size), start(start), headerSize(headerSize), policy(policy),
@@ -140,6 +141,28 @@ int findFirstBlock(Malloc &m, int sizeWithHead, int firstIdx) {
     return firstIdx;
 }
 
+int findNextFitBlock(Malloc &m, int sizeWithHead) {
+    int count = 0;
+
+    for (int i = m.lastAllocatedIdx; i < m.freelist.size(); ++i) {
+        if (m.freelist[i].second >= sizeWithHead) {
+            m.lastAllocatedIdx = i; 
+            return i;
+        }
+        count++;
+    }
+
+    for (int i = 0; i < m.lastAllocatedIdx; ++i) {
+        if (m.freelist[i].second >= sizeWithHead) {
+            m.lastAllocatedIdx = i;
+            return i;
+        }
+        count++;
+    }
+
+    return -1; 
+}
+
 
 // Find the address and size to be allocated according to the policy
 std::pair<int, int> allocate(Malloc &m, int request) {
@@ -158,7 +181,10 @@ std::pair<int, int> allocate(Malloc &m, int request) {
         bestIdx = findWorstBlock(m, sizeWithHead, bestIdx, bestSize);
     } else if (m.policy == Policy::FIRST) {
         bestIdx = findFirstBlock(m, sizeWithHead, bestIdx);
+    } else if (m.policy == Policy::NEXTFIT) {
+        bestIdx = findNextFitBlock(m, sizeWithHead);
     }
+
 
     if (bestIdx != -1) {
         int bestAddress = m.freelist[bestIdx].first;
@@ -237,8 +263,7 @@ int free(Malloc &m, int blockID) {
 }
 
 
-
-
+// Command line related functions
 struct Options
 {
     int size = 100;
@@ -256,7 +281,7 @@ void showHelp() {
               << "-S,         size of the heap\n"
               << "-B,         base address of the heap\n"
               << "-H,         size of the header\n"
-              << "-P,         list search policy (BEST, WORST, FIRST)\n"
+              << "-P,         list search policy (BEST, WORST, FIRST, NEXTFIT)\n"
               << "-l,         list order (ADDRSORT, SIZESORT+, SIZESORT-)\n"
               << "-C,         coalesce the free list?\n"
               << "-A,         list of operations (+10,-0,etc)\n"
@@ -365,6 +390,8 @@ Options parseOptions(int argc, char *argv[])
                     opts.policy = Policy::WORST;
                 else if (policyStr == "FIRST")
                     opts.policy = Policy::FIRST;
+                else if (policyStr == "NEXTFIT")
+                    opts.policy = Policy::NEXTFIT;
                 else
                     Abort("Invalid policy: " + policyStr);
             }
@@ -419,7 +446,7 @@ Options parseOptions(int argc, char *argv[])
     return opts;
 }
 
-
+// Main function
 int main(int argc, char const *argv[]) {
     Options opts = parseOptions(argc, (char **)argv);
 
