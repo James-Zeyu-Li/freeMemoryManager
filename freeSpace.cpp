@@ -34,6 +34,7 @@ struct Malloc {
     }
 };
 
+// Print FreeList, Print Allocated Blocks, Print Initial Setup
 // The function to dump the free list
 void dumpFreeList(const Malloc &m) {
     cout << "Free List [Size: " << m.freelist.size() << "]: ";
@@ -65,39 +66,98 @@ void printInitialSetup(const Malloc &m) {
 }
 
 
+// Helper function to enable faster process according to policy
+// if freelist from small to large, the first block that fits the request is the best
+// The worst block will always be the first working block from large to small
+int findBestBlock(Malloc &m, int sizeWithHead, int bestIdx, int bestSize) {
+    if(m.order == Order::SIZESORT_ASC){
+        for (int i = 0; i < m.freelist.size(); i++){
+            if (m.freelist[i].second >= sizeWithHead){
+                bestIdx = i;
+                break;
+            } 
+        }
+    } else if (m.order == Order::SIZESORT_DES){
+        for (int i = m.freelist.size() - 1; i >= 0; i--){
+            if (m.freelist[i].second >= sizeWithHead){
+                bestIdx = i;
+                break;
+            } 
+        }
+    } else if (m.order == Order::ADDRSORT){
+        for(int i = 0; i < m.freelist.size(); i++){
+            if (m.freelist[i].second >= sizeWithHead) {
+                if (m.freelist[i].second < bestSize){
+                    bestSize = m.freelist[i].second;
+                    bestIdx = i;
+                }
+            }
+        }
+    }     
+    return bestIdx;
+}
+
+// Find the worst block according to the policy
+// if freelist from small to large, the first block that fits the request is the worst
+// The worst block will always be the first working block from large to small
+int findWorstBlock(Malloc &m, int sizeWithHead, int worstIdx, int worstSize) {
+    if(m.order == Order::SIZESORT_ASC){
+        for (int i = m.freelist.size() - 1; i >= 0; i--){
+            if (m.freelist[i].second >= sizeWithHead){
+                worstIdx = i;
+                break;
+            } 
+        }
+    } else if (m.order == Order::SIZESORT_DES){
+        for (int i = 0; i < m.freelist.size(); i++){
+            if (m.freelist[i].second >= sizeWithHead){
+                worstIdx = i;
+                break;
+            } 
+        }
+    } else if (m.order == Order::ADDRSORT){
+        for(int i = 0; i < m.freelist.size(); i++){
+            if (m.freelist[i].second >= sizeWithHead) {
+                if (m.freelist[i].second > worstSize){
+                    worstSize = m.freelist[i].second;
+                    worstIdx = i;
+                }
+            }   
+        }
+    }
+
+    return worstIdx;
+}
+
+int findFirstBlock(Malloc &m, int sizeWithHead, int firstIdx) {
+    for (int i = 0; i < m.freelist.size(); i++){
+        if (m.freelist[i].second >= sizeWithHead){
+            firstIdx = i;
+            break;
+        } 
+    }
+
+    return firstIdx;
+}
+
+
 // Find the address and size to be allocated according to the policy
 std::pair<int, int> allocate(Malloc &m, int request) {
     int bestIdx = -1;
-    int bestSize = -1;
+    int bestSize = m.size + 1;
+    int worstIdx = -1;
+    int worstSize = -1;
     int count = 0;
 
     int sizeWithHead = request + m.headerSize;
-
+    
     // set best address if the policy selection is BEST
-    if (m.policy == Policy::BEST)     {
-        bestSize = m.size + 1;
-    }
-    else     {
-        bestSize = -1;
-    }
-
-    // Find the best address and best size according to the policy
-    for (int i = 0; i < m.freelist.size(); i++)     {
-        count++;
-        int address = m.freelist[i].first;
-        int size = m.freelist[i].second;
-
-        if (size >= sizeWithHead) {
-            if ((m.policy == Policy::BEST && size < bestSize) ||
-                (m.policy == Policy::WORST && size > bestSize)){
-                bestSize = size;
-                bestIdx = i;
-            }
-
-            if (m.policy == Policy::FIRST){
-                break;
-            }
-        }
+    if (m.policy == Policy::BEST) {
+        bestIdx = findBestBlock(m, sizeWithHead, bestIdx, bestSize);
+    } else if (m.policy == Policy::WORST) {
+        bestIdx = findWorstBlock(m, sizeWithHead, bestIdx, bestSize);
+    } else if (m.policy == Policy::FIRST) {
+        bestIdx = findFirstBlock(m, sizeWithHead, bestIdx);
     }
 
     if (bestIdx != -1) {
@@ -177,6 +237,8 @@ int free(Malloc &m, int blockID) {
 }
 
 
+
+
 struct Options
 {
     int size = 100;
@@ -188,7 +250,6 @@ struct Options
     vector<Job> jobList = {
         Job{vector<int>{+7, -0, +5, +4, +9, -2, -1, -3, +80}}}; 
 };
-
 
 void showHelp() {
     std::cout << "Usage:\n"
